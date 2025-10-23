@@ -6,8 +6,11 @@ analysis. It includes tools for phase generation, distribution centering, and
 maintaining probability distribution invariants.
 """
 
+import matplotlib.pyplot as plt
 import numpy as np
+from scipy.stats import norm
 from config import Z_RANGE, BINS
+import sys
 
 
 # ---------- Initial distribution helpers ---------- #
@@ -88,6 +91,8 @@ class Probability_Distribution:
         )
         cdf = histogram_values.cumsum()
         cdf = cdf / cdf[-1]
+        self.domain_min, self.domain_max = range
+        self.raw_values = values
         self.bin_edges = bin_edges
         self.histogram_values = histogram_values
         self.cdf = cdf
@@ -143,7 +148,7 @@ class Probability_Distribution:
         cdf /= cdf[-1]
         self.cdf = cdf
 
-    def mean_and_std(self) -> tuple:
+    def mean_and_std_from_hist(self) -> tuple:
         """Calculate mean and standard deviation of the distribution.
 
         Uses the normalized histogram values to compute first and second
@@ -162,6 +167,12 @@ class Probability_Distribution:
         standard_deviation = np.sqrt(variance)
         return mean, standard_deviation
 
+    def mean_and_std_from_raw_data(self) -> tuple:
+        mean = np.mean(self.raw_values)
+        std = np.std(self.raw_values.std)
+        return mean, std
+
+    # TODO: Sort out sampler for both t and z distributions, decide on how to handle them
     def sample(self, N: int) -> np.ndarray:
         """Generate random samples from the distribution.
 
@@ -180,19 +191,31 @@ class Probability_Distribution:
             Array of N samples drawn from the distribution.
         """
         # u = np.random.uniform(0, 1 + 1e-15, N)
-        u = np.random.uniform(0, 1, N)
-        index = np.searchsorted(self.cdf, u)
-        index = np.clip(index, 0, len(self.cdf) - 1)
-        left_edge = self.bin_edges[index]
-        right_edge = self.bin_edges[index + 1]
+        z_samples = norm.rvs(self.raw_values, size=N)
 
-        left_cdf = np.where(index == 0, 0.0, self.cdf[index - 1])
-        right_cdf = self.cdf[index]
+        # Gaussian fit params for z
+        mu, sigma = norm.fit(z_samples)
 
-        # denominator = np.maximum(right_cdf - left_cdf, 1e-15)
-        denominator = right_cdf - left_cdf
-        fraction = (u - left_cdf) / denominator
-        return left_edge + fraction * (right_edge - left_edge)
+        # Gaussian pdf of bin centers with fitted params
+        bin_centers = 0.5 * (self.bin_edges[:-1] + self.bin_edges[1:])
+        gauss_pdf = norm.pdf(bin_centers, loc=mu, scale=sigma)
+
+        # Ratio of Q(z)/gauss(z)
+        scaling_factor = max(self.histogram_values / gauss_pdf)
+        plt.close()
+        plt.xlim(self.domain_min, self.domain_max)
+        plt.ylim(0, 1)
+        plt.plot(bin_centers, self.histogram_values, label="Q(z)")
+        plt.plot(
+            bin_centers,
+            scaling_factor * gauss_pdf,
+            label="M*m(z), scaling factor * fitted gaussian",
+        )
+        plt.legend()
+        plt.savefig("test_sampling.png", dpi=300)
+        sys.exit(0)
+        acceptance_rate = self.histogram_values / (scaling_factor * gauss_pdf)
+        np.divide()
 
 
 def center_z_distribution(Q_z: Probability_Distribution) -> Probability_Distribution:
