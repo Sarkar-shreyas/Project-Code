@@ -219,8 +219,8 @@ def rg_iterations_for_fp(
             delta = current_Qz.histogram_distances(
                 previous_Qz.histogram_values, previous_Qz.bin_edges
             )
-            previous_mean, previous_std = previous_Qz.mean_and_std()
-            current_mean, current_std = current_Qz.mean_and_std()
+            previous_mean, previous_std = previous_Qz.mean_and_std_from_hist()
+            current_mean, current_std = current_Qz.mean_and_std_from_hist()
             std_diff = current_std - previous_std
             parameter_storage.append((_, delta, current_std, current_mean))
             if delta < DIST_TOLERANCE:
