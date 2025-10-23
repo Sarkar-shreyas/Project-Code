@@ -7,3 +7,5 @@ simplify.py
 *.json
 *.png
 __pycache__/
+/data
+.xlsx

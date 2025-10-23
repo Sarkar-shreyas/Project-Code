@@ -1,19 +1,21 @@
 import numpy as np
 import matplotlib
 from typing import Optional
+from mpl_toolkits.axes_grid1 import inset_locator
+from scipy.stats import norm
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import time
-from utils import convert_t_to_z, convert_z_to_g
-from distribution_production import (
+from .utils import convert_t_to_z, convert_z_to_g
+from .distribution_production import (
     generate_initial_t_distribution,
     generate_random_phases,
     center_z_distribution,
     Probability_Distribution,
     extract_t_samples,
 )
-from config import BINS, N, T_RANGE
+from config import BINS, N, T_RANGE, EXPRESSION, DIST_TOLERANCE, STD_TOLERANCE
 
 
 # ---------- t prime definition ---------- #
@@ -58,56 +60,57 @@ def generate_t_prime(t: np.ndarray, phi: np.ndarray) -> np.ndarray:
     r4 = np.sqrt(1 - t4 * t4)
     r5 = np.sqrt(1 - t5 * t5)
 
-    # Jack's Form from Shaw(Black)
-    numerator = (
-        (r1 * t2)
-        + ((r1**2 - t1**2) * (np.exp(1j * phi3)))
-        - (t1 * t3 * r2 * r4 * r5 * np.exp(1j * (phi2 + phi3 - phi1)))
-    )
-    denominator = (
-        1
-        - (t3 * t4 * t5 * np.exp(1j * phi4))
-        - (r2 * r3 * r4 * np.exp(1j * (phi2)))
-        - (t1 * t2 * t3 * t4 * np.exp(1j * (phi2 + phi4)))
-        - (t1 * t2 * t3 * np.exp(1j * phi1))
-        - (r1 * r3 * r5 * np.exp(1j * phi3))
-        + (r1 * r2 * r3 * r4 * np.exp(1j * (phi2 + phi3)))
-    )
+    if EXPRESSION == "Jack":
+        # Jack's Form from Shaw(Black)
+        numerator = (
+            (r1 * t2)
+            + ((r1**2 - t1**2) * (np.exp(1j * phi3)))
+            - (t1 * t3 * r2 * r4 * r5 * np.exp(1j * (phi2 + phi3 - phi1)))
+        )
+        denominator = (
+            1
+            - (t3 * t4 * t5 * np.exp(1j * phi4))
+            - (r2 * r3 * r4 * np.exp(1j * (phi2)))
+            - (t1 * t2 * t3 * t4 * np.exp(1j * (phi2 + phi4)))
+            - (t1 * t2 * t3 * np.exp(1j * phi1))
+            - (r1 * r3 * r5 * np.exp(1j * phi3))
+            + (r1 * r2 * r3 * r4 * np.exp(1j * (phi2 + phi3)))
+        )
+    elif EXPRESSION == "Shreyas":
+        # My matrix (Blue)
+        numerator = (r1 * t2 * (1 - np.exp(1j * phi4) * t3 * t4 * t5)) - (
+            np.exp(1j * phi3)
+            * r5
+            * (r3 * t2 + np.exp(1j * (phi2 - phi1)) * r2 * r4 * t1 * t3)
+        )
 
-    # My matrix (Blue)
-    # numerator = (r1 * t2 * (1 - np.exp(1j * phi4) * t3 * t4 * t5)) - (
-    #     np.exp(1j * phi3)
-    #     * r5
-    #     * (r3 * t2 + np.exp(1j * (phi2 - phi1)) * r2 * r4 * t1 * t3)
+        denominator = (r3 - np.exp(1j * phi3) * r1 * r5) * (
+            r3 - np.exp(1j * phi2) * r2 * r4
+        ) + (t3 + np.exp(1j * phi4) * t4 * t5) * (t3 + np.exp(1j * phi1) * t1 * t2)
+    else:
+        # Shaw's form (2023 thesis paper)
+        numerator = (
+            -(np.exp(1j * (phi1 + phi4 - phi2)) * (r1 * r3 * r5 * t2 * t4))
+            + ((t2 * t4) * (np.exp(1j * (phi1 + phi4))))
+            - (np.exp(1j * phi4) * t1 * t3 * t4)
+            + (np.exp(1j * phi3) * r2 * r3 * r4 * t1 * t5)
+            - (np.exp(1j * phi1) * t2 * t3 * t5)
+        )
+        denominator = (
+            -1
+            - (r2 * r3 * r4 * np.exp(1j * (phi3)))
+            + (r1 * r3 * r5 * np.exp(1j * phi2))
+            + (r1 * r2 * r4 * r5 * np.exp(1j * (phi2 + phi3)))
+            + (t1 * t2 * t3 * np.exp(1j * phi1))
+            - (t1 * t2 * t4 * t5 * np.exp(1j * (phi1 + phi4)))
+            + (t3 * t4 * t5 * np.exp(1j * phi4))
+        )
+
+    # t_prime = np.abs(
+    #     numerator / np.where(np.abs(denominator) < 1e-12, np.nan + 0j, denominator)
     # )
-
-    # denominator = (r3 - np.exp(1j * phi3) * r1 * r5) * (
-    #     r3 - np.exp(1j * phi2) * r2 * r4
-    # ) + (t3 + np.exp(1j * phi4) * t4 * t5) * (t3 + np.exp(1j * phi1) * t1 * t2)
-
-    # Shaw's form (2023 thesis paper)
-    # numerator = (
-    #     -(np.exp(1j * (phi1 + phi4 - phi2)) * (r1 * r3 * r5 * t2 * t4))
-    #     + ((t2 * t4) * (np.exp(1j * (phi1 + phi4))))
-    #     - (np.exp(1j * phi4) * t1 * t3 * t4)
-    #     + (np.exp(1j * phi3) * r2 * r3 * r4 * t1 * t5)
-    #     - (np.exp(1j * phi1) * t2 * t3 * t5)
-    # )
-    # denominator = (
-    #     -1
-    #     - (r2 * r3 * r4 * np.exp(1j * (phi3)))
-    #     + (r1 * r3 * r5 * np.exp(1j * phi2))
-    #     + (r1 * r2 * r4 * r5 * np.exp(1j * (phi2 + phi3)))
-    #     + (t1 * t2 * t3 * np.exp(1j * phi1))
-    #     - (t1 * t2 * t4 * t5 * np.exp(1j * (phi1 + phi4)))
-    #     + (t3 * t4 * t5 * np.exp(1j * phi4))
-    # )
-
-    t_prime = np.abs(
-        numerator / np.where(np.abs(denominator) < 1e-12, np.nan + 0j, denominator)
-    )
-    # t_prime = np.abs(numerator) / np.abs(denominator)
-
+    t_prime = np.abs(np.abs(numerator) / np.abs(denominator))
+    return t_prime
     return np.clip(t_prime, 0.0, 1.0 - 1e-15)
 
 
@@ -175,7 +178,11 @@ def rg_iterations_for_fp(
     ax1.set_xlabel("t")
     ax1.set_ylabel("P(t)")
     ax1.set_title("Evolution of P(t)")
-
+    ax2 = inset_locator.inset_axes(ax0, width="30%", height=0.6)
+    ax2.set_xlim(-25, 25)
+    ax2.set_ylim(0, 0.3)
+    ax2.set_xlabel("z")
+    ax2.set_ylabel("Q(z)")
     inner_start_time = time.time()
     print("-" * 100)
     print("Beginning procedure")
@@ -199,11 +206,12 @@ def rg_iterations_for_fp(
         # Recenter z and initialise histogram
         current_Qz = Probability_Distribution(next_z, bins)
         current_Qz = center_z_distribution(current_Qz)
-        if _ in set(range(1, K, 2)):
+        if _ in set([1, 2, K - 1]):
             z_centers = 0.5 * (current_Qz.bin_edges[:-1] + current_Qz.bin_edges[1:])
             ax0.plot(z_centers, current_Qz.histogram_values, label=f"Iteration {_}")
             t_centers = 0.5 * (P_t.bin_edges[:-1] + P_t.bin_edges[1:])
             ax1.plot(t_centers, P_t.histogram_values, label=f"Iteration {_}")
+            ax2.plot(z_centers, current_Qz.histogram_values)
             print(f"Values have been plotted for iteration {_}")
 
         # Check for convergence
@@ -213,15 +221,23 @@ def rg_iterations_for_fp(
             )
             previous_mean, previous_std = previous_Qz.mean_and_std()
             current_mean, current_std = current_Qz.mean_and_std()
-            parameter_storage.append((_, delta, current_std))
-            if delta < 1e-3:
+            std_diff = current_std - previous_std
+            parameter_storage.append((_, delta, current_std, current_mean))
+            if delta < DIST_TOLERANCE:
+                if std_diff <= STD_TOLERANCE:
+                    print(f"std converged as well: {std_diff} at step {_}")
                 num_convergences += 1
                 print(f"Converged at iteration #{_}")
                 if num_convergences == 3 or _ == K - 1:
+                    np.savetxt(
+                        f"data/{EXPRESSION}/Fixed_point/Converged_t_prime_{N}_iters.txt",
+                        next_t,
+                    )
                     ax0.legend()
                     ax1.legend()
                     plt.savefig(
-                        f"plots/Jack_converged_z_dist_with_{N}_iters.png", dpi=150
+                        f"plots/{EXPRESSION}/Fixed_point/Converged_z_dist_with_{N}_iters.png",
+                        dpi=150,
                     )
                     print("Updated plot file with FP distribution")
                     print("-" * 100)
@@ -238,12 +254,35 @@ def rg_iterations_for_fp(
         previous_Qz = current_Qz
 
     # If it didn't converge, return the final set of data
-    ax0.legend()
+    np.savetxt(f"data/{EXPRESSION}/Fixed_point/t_prime_{N}_iters.txt", next_t)
+    np.savetxt(
+        f"data/{EXPRESSION}/Fixed_point/p_t_{N}_iters.txt",
+        P_t.histogram_values,
+    )
+    np.savetxt(
+        f"data/{EXPRESSION}/Fixed_point/p_t_bins_{N}_iters.txt",
+        P_t.bin_edges,
+    )
+    np.savetxt(
+        f"data/{EXPRESSION}/Fixed_point/q_z_{N}_iters.txt",
+        previous_Qz.histogram_values,  # type: ignore
+    )
+    np.savetxt(
+        f"data/{EXPRESSION}/Fixed_point/q_z_bins_{N}_iters.txt",
+        previous_Qz.bin_edges,  # type: ignore
+    )
+    gauss_z = norm.pdf(previous_Qz.sample(N), -25, 25)  # type: ignore
+    x = np.linspace(-25, 25, N)
+    # ax0.plot(x, gauss_z, marker="o", color="green")
+    ax0.legend(loc="upper left")
     ax1.legend()
-    plt.tight_layout()
+    # plt.tight_layout()
+    plt.xticks(visible=True)
+    plt.yticks(visible=True)
     print("Updated plot file without convergence")
     print("-" * 100)
-    plt.savefig(f"plots/Jack_z_dist_with_{N}_iters.png", dpi=150)
+    plt.savefig(f"plots/{EXPRESSION}/Fixed_point/z_dist_with_{N}_iters.png", dpi=150)
+    plt.close()
     return previous_Qz, P_t, parameter_storage  # type: ignore
 
 

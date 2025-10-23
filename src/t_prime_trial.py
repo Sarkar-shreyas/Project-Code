@@ -3,11 +3,13 @@ import numpy as np
 
 def generate_phi():
     phi = np.random.uniform(0, 2 * np.pi, 4)
+    return (0, 0, 0, 0)
     return tuple(phi.tolist())
 
 
 def generate_t():
     t = np.random.random(5)
+    return tuple(np.sqrt((0.5, 0.5, 0.5, 0.5, 0.5)))
     return tuple(t.tolist())
 
 
@@ -35,10 +37,7 @@ def generate_r(t1, t2, t3, t4, t5):
 
 
 def calculate_t_prime(numerator, denominator):
-    return np.abs(
-        np.abs(numerator)
-        / np.where(np.abs(denominator) < 1e-12, np.nan + 0j, denominator)
-    )
+    return np.abs(np.abs(numerator) / np.abs(denominator))
 
 
 if __name__ == "__main__":

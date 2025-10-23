@@ -48,7 +48,8 @@ def generate_initial_t_distribution(N: int) -> np.ndarray:
     numpy.ndarray
         Array of N amplitude values t = √g where g ~ U[0,1].
     """
-    g_sample = np.random.uniform(0, 1.0 + 1e-15, N)
+    # g_sample = np.random.uniform(0, 1.0 + 1e-15, N)
+    g_sample = np.random.uniform(0, 1.0, N)
     t_dist = np.sqrt(g_sample)
     return t_dist
 
@@ -178,7 +179,8 @@ class Probability_Distribution:
         numpy.ndarray
             Array of N samples drawn from the distribution.
         """
-        u = np.random.uniform(0, 1 + 1e-15, N)
+        # u = np.random.uniform(0, 1 + 1e-15, N)
+        u = np.random.uniform(0, 1, N)
         index = np.searchsorted(self.cdf, u)
         index = np.clip(index, 0, len(self.cdf) - 1)
         left_edge = self.bin_edges[index]
@@ -187,7 +189,8 @@ class Probability_Distribution:
         left_cdf = np.where(index == 0, 0.0, self.cdf[index - 1])
         right_cdf = self.cdf[index]
 
-        denominator = np.maximum(right_cdf - left_cdf, 1e-15)
+        # denominator = np.maximum(right_cdf - left_cdf, 1e-15)
+        denominator = right_cdf - left_cdf
         fraction = (u - left_cdf) / denominator
         return left_edge + fraction * (right_edge - left_edge)
 

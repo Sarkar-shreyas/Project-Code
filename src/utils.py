@@ -7,6 +7,8 @@ handling of edge cases.
 """
 
 import numpy as np
+import json
+from config import EXPRESSION
 
 
 # ---------- Variable conversion helpers ---------- #
@@ -89,3 +91,13 @@ def convert_t_to_z(t: np.ndarray) -> np.ndarray:
         Array of z values, same shape as input.
     """
     return convert_g_to_z(convert_t_to_g(t))
+
+
+# ---------- Data management ---------- #
+def savedata(data, filename):
+    with open(
+        f"data/{EXPRESSION}/{filename}.json",
+        "a",
+        encoding="utf-8",
+    ) as f:
+        json.dump(data, f, indent=2)
