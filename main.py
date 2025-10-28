@@ -21,8 +21,8 @@ if __name__ == "__main__":
     final_params = list(params[-1])
     data = "".join(
         [
-            f"Iteration #: {step}, Distance: {dist}, Std: {std}\n"
-            for step, dist, std in params
+            f"Iteration #: {step}, Distance: {dist}, Std: {std}, Mean: {mean}\n"
+            for step, dist, std, mean in params
         ]
     )
 
