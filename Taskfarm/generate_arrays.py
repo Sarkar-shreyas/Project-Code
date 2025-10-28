@@ -7,7 +7,7 @@ import sys
 
 
 def generate_phi(num: int = 0) -> np.ndarray:
-    phi = np.random.uniform(0, 2 * np.pi, num)
+    phi = np.random.uniform(0, 2 * np.pi, (num, 4))
 
     return phi
 
@@ -62,6 +62,6 @@ if __name__ == "__main__":
     phi = generate_phi(N)
     t_prime = calculate_t_prime(t, r, phi)
 
-    filename = f"{output_dir}/t_prime_{N}_samples"
+    filename = f"{output_dir}/data/t_prime_{N}_samples"
     np.savetxt(filename, t_prime)
     print(f"Results saved to {filename}.")
