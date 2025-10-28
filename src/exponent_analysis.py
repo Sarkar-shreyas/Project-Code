@@ -133,7 +133,7 @@ def estimate_z_peak(Q_z: Probability_Distribution) -> float:
     float
         Arithmetic mean of the per-subset peak estimates.
     """
-    z_subsets = np.array([Q_z.sample(N // 10) for _ in range(10)])
+    z_subsets = np.array([Q_z.sample_z(N // 10) for _ in range(10)])
 
     mu_values = [get_peak_from_subset(z_subset) for z_subset in z_subsets]
 
@@ -247,7 +247,7 @@ def critical_exponent_estimation(
 
     # Run through the perturbations in the list
     for i, perturbation in enumerate(perturbation_list):
-        z_sample = fixed_point_Qz.sample(N)
+        z_sample = fixed_point_Qz.sample_z(N)
         perturbed_z = z_sample - perturbation
 
         # Generates the perturbed distribution
@@ -255,14 +255,14 @@ def critical_exponent_estimation(
 
         # Store the first peak prior to any RG steps for each perturbation
         z_peaks[0, i] = estimate_z_peak(perturbed_Qz) - unperturbed_z_peak
-        # z_peaks[0, i] = estimate_z_peak(perturbed_Qz.sample(N))
+        # z_peaks[0, i] = estimate_z_peak(perturbed_Qz.sample_z(N))
 
         print(f"Performing RG step on perturbation {i}, z_0 = {perturbation:.3f}")
 
         # Perform RG iterations for the specific perturbation
         for n in range(1, K + 1):
             next_Qz = rg_iterator_for_nu(perturbed_Qz)
-            # next_z_sample = next_Qz.sample(N)
+            # next_z_sample = next_Qz.sample_z(N)
 
             # Store the difference between the peak of the perturbed distribution and the unperturbed distribution
             # z_peaks[n, i] = estimate_z_peak(next_z_sample) - unperturbed_z_peak

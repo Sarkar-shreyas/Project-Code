@@ -54,7 +54,7 @@ def plot_beta_fixed_params(
         values += 1e-3
 
     bin_centers = 0.5 * (bins[:-1] + bins[1:])
-    plt.plot(bin_centers, values, label="Beta fixed params")
+    plt.plot(bin_centers, 3 * values, label="Beta fixed params")
     print("Plotted data for fixed constraints")
     return values
 

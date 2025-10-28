@@ -247,8 +247,8 @@ def rg_iterations_for_fp(
                 print("=" * 100)
 
         # Update distributions and values for next iteration
-
-        next_g = convert_z_to_g(current_Qz.sample(N))
+        print("no previous z distribution existed, here we are.")
+        next_g = convert_z_to_g(current_Qz.sample_z(N))
         next_t = np.sqrt(next_g)
         P_t = Probability_Distribution(next_t, bins, range=T_RANGE)
         previous_Qz = current_Qz
@@ -271,8 +271,7 @@ def rg_iterations_for_fp(
         f"data/{EXPRESSION}/Fixed_point/q_z_bins_{N}_iters.txt",
         previous_Qz.bin_edges,  # type: ignore
     )
-    gauss_z = norm.pdf(previous_Qz.sample(N), -25, 25)  # type: ignore
-    x = np.linspace(-25, 25, N)
+
     # ax0.plot(x, gauss_z, marker="o", color="green")
     ax0.legend(loc="upper left")
     ax1.legend()
@@ -310,7 +309,7 @@ def rg_iterator_for_nu(Qz: Probability_Distribution) -> Probability_Distribution
     and uses the same sampling parameters N defined in config.
     """
 
-    z_sample = Qz.sample(N)
+    z_sample = Qz.sample_z(N)
     g_values = convert_z_to_g(z_sample)
     t_values = np.sqrt(g_values)
     P_t = Probability_Distribution(t_values, BINS, range=T_RANGE)

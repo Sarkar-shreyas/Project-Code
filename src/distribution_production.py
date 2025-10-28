@@ -8,8 +8,8 @@ maintaining probability distribution invariants.
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.stats import norm
-from config import Z_RANGE, BINS
+from scipy.stats import norm, beta
+from config import T_RANGE, Z_RANGE, BINS
 import sys
 
 
@@ -169,11 +169,11 @@ class Probability_Distribution:
 
     def mean_and_std_from_raw_data(self) -> tuple:
         mean = np.mean(self.raw_values)
-        std = np.std(self.raw_values.std)
+        std = np.std(self.raw_values)
         return mean, std
 
     # TODO: Sort out sampler for both t and z distributions, decide on how to handle them
-    def sample(self, N: int) -> np.ndarray:
+    def sample_t(self, num: int) -> np.ndarray:
         """Generate random samples from the distribution.
 
         Uses inverse transform sampling: generates uniform random numbers,
@@ -190,32 +190,109 @@ class Probability_Distribution:
         numpy.ndarray
             Array of N samples drawn from the distribution.
         """
-        # u = np.random.uniform(0, 1 + 1e-15, N)
-        z_samples = norm.rvs(self.raw_values, size=N)
 
-        # Gaussian fit params for z
-        mu, sigma = norm.fit(z_samples)
+        # Fit the data to a beta distribution
+        alpha, b, _, _ = beta.fit(self.raw_values, floc=0, fscale=1)
+        # print("Fitting done.")
+        # Construct the PDF q(t)
+        fitted_distribution = beta.pdf(self.raw_values, alpha, b, loc=0, scale=1)
 
-        # Gaussian pdf of bin centers with fitted params
-        bin_centers = 0.5 * (self.bin_edges[:-1] + self.bin_edges[1:])
-        gauss_pdf = norm.pdf(bin_centers, loc=mu, scale=sigma)
+        # Get the indices of the bins each value falls under, then we can slice out the relevant values
+        bin_positions = np.digitize(self.raw_values, self.bin_edges) - 1
+        bin_positions = np.clip(bin_positions, 0, BINS - 1)
+        original_distribution = self.histogram_values[bin_positions]
 
-        # Ratio of Q(z)/gauss(z)
-        scaling_factor = max(self.histogram_values / gauss_pdf)
-        plt.close()
-        plt.xlim(self.domain_min, self.domain_max)
-        plt.ylim(0, 1)
-        plt.plot(bin_centers, self.histogram_values, label="Q(z)")
-        plt.plot(
-            bin_centers,
-            scaling_factor * gauss_pdf,
-            label="M*m(z), scaling factor * fitted gaussian",
+        # The scaling ratio to ensure Mq >= p for all x
+        scaling_factor = 1.02 * np.max(
+            original_distribution / (fitted_distribution + 1e-15)
         )
-        plt.legend()
-        plt.savefig("test_sampling.png", dpi=300)
-        sys.exit(0)
-        acceptance_rate = self.histogram_values / (scaling_factor * gauss_pdf)
-        np.divide()
+
+        # Initialise accepted array and remaining tracker
+        accepted_vals = []
+        remaining = num
+        # print("Scaling factor found, time to populate t")
+        # Loop until we have an array of size num
+        while remaining > 0:
+            # Random draws from the beta distribution
+            sample: np.ndarray = beta.rvs(alpha, b, loc=0, scale=1, size=remaining)  # type: ignore
+
+            # Uniform draws from 0 to 1
+            uniform_samples = np.random.uniform(0, 1, size=remaining)
+
+            # Construct the pdfs of the beta distribution and existing values
+            sample_vals = beta.pdf(sample, alpha, b, loc=0, scale=1)
+            indices = np.digitize(sample, self.bin_edges) - 1
+            indices = np.clip(indices, 0, BINS - 1)
+            original_vals = self.histogram_values[indices]
+
+            # Mask for slicing valid values
+            acceptance_mask = uniform_samples <= (
+                original_vals / (scaling_factor * sample_vals)
+            )
+            accepted = sample[acceptance_mask]
+
+            # If we get usable values, update corresponding arrays
+            if len(accepted) > 0:
+                # print("Populating some values")
+                amount_needed = min(remaining, len(accepted))
+                accepted_vals.append(accepted[:amount_needed])
+                remaining -= amount_needed
+        # print("Population done.")
+        return np.concatenate(accepted_vals)
+
+    def sample_z(self, num: int) -> np.ndarray:
+        # Fit the data to a Gaussian distribution
+        mu, sigma = norm.fit(self.raw_values)
+        # print("Fitting done.")
+        # Construct the pdf of z
+        bin_centers = 0.5 * (self.bin_edges[1:] + self.bin_edges[:-1])
+        fitted_distribution = norm.pdf(bin_centers, loc=mu, scale=sigma)
+
+        # Do the same thing as in the t distribution, get the indices first
+        bin_positions = np.digitize(self.raw_values, self.bin_edges) - 1
+        bin_positions = np.clip(bin_positions, 0, BINS - 1)
+        # original_distribution = self.histogram_values[bin_positions]
+
+        # The scaling ratio to ensure Mq >= p for all x
+        scaling_mask = fitted_distribution >= 1e-8
+        scaling_factor = 1.02 * np.max(
+            self.histogram_values[scaling_mask] / fitted_distribution[scaling_mask]
+        )
+
+        # Initialise accepted array and remaining tracker
+        accepted_vals = []
+        remaining = num
+        # print("Scaling factor found, time to populate z")
+        # Loop until we have an array of size num
+        while remaining > 0:
+            # Random draws from the gaussian distribution
+            sample: np.ndarray = norm.rvs(loc=mu, scale=sigma, size=remaining)  # type: ignore
+
+            # Uniform draws from 0 to 1
+            uniform_samples = np.random.uniform(0, 1, size=remaining)
+
+            # Construct the pdfs of the gaussian distribution and existing values
+            sample_vals = norm.pdf(sample, loc=mu, scale=sigma)
+            indices = np.digitize(sample, self.bin_edges) - 1
+            indices = np.clip(indices, 0, BINS - 1)
+            original_vals = self.histogram_values[indices]
+
+            # Mask for slicing valid values
+            acceptance_mask = uniform_samples <= (
+                original_vals / (scaling_factor * sample_vals)
+            )
+            accepted = sample[acceptance_mask]
+
+            # If we get usable values, update corresponding arrays
+            if len(accepted) > 0:
+                # print("Populating some values")
+                amount_needed = min(remaining, len(accepted))
+                accepted_vals.append(accepted[:amount_needed])
+                remaining -= amount_needed
+                print(f"Accepted: {len(accepted)}, Remaining: {remaining}")
+
+        # print("Population done.")
+        return np.concatenate(accepted_vals)
 
 
 def center_z_distribution(Q_z: Probability_Distribution) -> Probability_Distribution:
@@ -273,11 +350,11 @@ def extract_t_samples(P_t: Probability_Distribution, N: int) -> np.ndarray:
     numpy.ndarray
         Array of shape (N, 5) containing the sampled amplitude values.
     """
-    t1 = P_t.sample(N)
-    t2 = P_t.sample(N)
-    t3 = P_t.sample(N)
-    t4 = P_t.sample(N)
-    t5 = P_t.sample(N)
+    t1 = P_t.sample_t(N)
+    t2 = P_t.sample_t(N)
+    t3 = P_t.sample_t(N)
+    t4 = P_t.sample_t(N)
+    t5 = P_t.sample_t(N)
 
     t_sample = np.stack([t1, t2, t3, t4, t5], axis=1)
     return t_sample
