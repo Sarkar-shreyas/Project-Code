@@ -9,7 +9,8 @@ maintaining probability distribution invariants.
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import norm, beta
-from config import T_RANGE, Z_RANGE, BINS
+from config import N, T_RANGE, Z_RANGE, BINS
+from time import time
 import sys
 
 
@@ -92,6 +93,7 @@ class Probability_Distribution:
         cdf = histogram_values.cumsum()
         cdf = cdf / cdf[-1]
         self.domain_min, self.domain_max = range
+        self.domain_width = np.abs(self.domain_min) + np.abs(self.domain_max)
         self.raw_values = values
         self.bin_edges = bin_edges
         self.histogram_values = histogram_values
@@ -203,9 +205,7 @@ class Probability_Distribution:
         original_distribution = self.histogram_values[bin_positions]
 
         # The scaling ratio to ensure Mq >= p for all x
-        scaling_factor = 1.02 * np.max(
-            original_distribution / (fitted_distribution + 1e-15)
-        )
+        scaling_factor = 1.02 * np.max(original_distribution / (fitted_distribution))
 
         # Initialise accepted array and remaining tracker
         accepted_vals = []
@@ -238,16 +238,40 @@ class Probability_Distribution:
                 accepted_vals.append(accepted[:amount_needed])
                 remaining -= amount_needed
         # print("Population done.")
-        return np.concatenate(accepted_vals)
+        accepted_array = np.concatenate(accepted_vals)
+        # bin_centers = 0.5 * (self.bin_edges[:-1] + self.bin_edges[1:])
+        # f, b = np.histogram(fitted_distribution, BINS, T_RANGE, density=True)
+        # print(scaling_factor)
+        # plt.close()
+        # vals, b = np.histogram(accepted_array, BINS, T_RANGE, density=True)
+        # plt.plot(bin_centers, vals, label="Accepted values")
+        # plt.plot(bin_centers, self.histogram_values, label="Original values")
+        # plt.plot(
+        #     bin_centers,
+        #     scaling_factor * f,
+        #     label="Scaled beta fit",
+        # )
+        # plt.plot(bin_centers, f, label="Base Beta fit")
+        # plt.legend()
+        # plt.savefig("tprime_plot.png", dpi=150)
+        # sys.exit(0)
+        return accepted_array
 
     def sample_z(self, num: int) -> np.ndarray:
-        # Fit the data to a Gaussian distribution
-        mu, sigma = norm.fit(self.raw_values)
+        # Get our gaussian fit params
+        mu, sigma = self.mean_and_std_from_hist()
         # print("Fitting done.")
+
         # Construct the pdf of z
         bin_centers = 0.5 * (self.bin_edges[1:] + self.bin_edges[:-1])
-        fitted_distribution = norm.pdf(bin_centers, loc=mu, scale=sigma)
-
+        fitted_distribution = norm.pdf(self.histogram_values, loc=mu, scale=sigma)
+        bin_widths = np.diff(self.bin_edges)
+        fitted_distribution /= np.sum(
+            fitted_distribution * bin_widths
+        )  # Renormalise it to sum to 1
+        print(self.domain_min, self.domain_max)
+        print(len(fitted_distribution), np.sum(fitted_distribution * bin_widths))
+        print(np.sum(self.histogram_values * bin_widths))
         # Do the same thing as in the t distribution, get the indices first
         bin_positions = np.digitize(self.raw_values, self.bin_edges) - 1
         bin_positions = np.clip(bin_positions, 0, BINS - 1)
@@ -258,12 +282,13 @@ class Probability_Distribution:
         scaling_factor = 1.02 * np.max(
             self.histogram_values[scaling_mask] / fitted_distribution[scaling_mask]
         )
-
+        print(scaling_factor)
         # Initialise accepted array and remaining tracker
         accepted_vals = []
         remaining = num
         # print("Scaling factor found, time to populate z")
         # Loop until we have an array of size num
+        start = time()
         while remaining > 0:
             # Random draws from the gaussian distribution
             sample: np.ndarray = norm.rvs(loc=mu, scale=sigma, size=remaining)  # type: ignore
@@ -289,10 +314,28 @@ class Probability_Distribution:
                 amount_needed = min(remaining, len(accepted))
                 accepted_vals.append(accepted[:amount_needed])
                 remaining -= amount_needed
-                print(f"Accepted: {len(accepted)}, Remaining: {remaining}")
-
-        # print("Population done.")
-        return np.concatenate(accepted_vals)
+                # print(f"Accepted: {len(accepted)}, Remaining: {remaining}")
+        end = time()
+        print(f"Population done in {end - start:.3f}seconds.")
+        accepted_array = np.concatenate(accepted_vals)
+        accepted_dist = norm.pdf(accepted_array, loc=mu, scale=sigma)
+        bin_centers = 0.5 * (self.bin_edges[:-1] + self.bin_edges[1:])
+        f, b = np.histogram(fitted_distribution, BINS, Z_RANGE, density=True)
+        print(f"z scaling factor: {scaling_factor}")
+        plt.close()
+        vals, b = np.histogram(accepted_array, BINS, Z_RANGE, density=True)
+        plt.plot(bin_centers, vals, label="Accepted values")
+        plt.plot(bin_centers, self.histogram_values, label="Original values")
+        # plt.plot(
+        #     bin_centers,
+        #     2 * f,
+        #     label="Scaled gaussian fit",
+        # )
+        # plt.plot(bin_centers, f, label="Base gaussian fit")
+        plt.legend()
+        plt.savefig("tprime_plot.png", dpi=150)
+        sys.exit(0)
+        return accepted_array
 
 
 def center_z_distribution(Q_z: Probability_Distribution) -> Probability_Distribution:
