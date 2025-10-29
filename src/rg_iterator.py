@@ -61,20 +61,22 @@ def generate_t_prime(t: np.ndarray, phi: np.ndarray) -> np.ndarray:
     r5 = np.sqrt(1 - t5 * t5)
 
     if EXPRESSION == "Jack":
-        # Jack's Form from Shaw(Black)
         numerator = (
-            (r1 * t2)
-            + ((r1**2 - t1**2) * (np.exp(1j * phi3)))
-            - (t1 * t3 * r2 * r4 * r5 * np.exp(1j * (phi2 + phi3 - phi1)))
+            -np.exp(1j * phi2) * r3 * t1 * t4
+            - np.exp(1j * (phi3 + phi2)) * t2 * t4
+            + np.exp(1j * (phi2 + phi3 - phi1)) * r1 * r5 * t2 * t3 * t4
+            + t1 * t5
+            + np.exp(1j * phi3) * r3 * t2 * t5
+            + np.exp(1j * phi4) * r2 * r4 * t1 * t3 * t5
         )
         denominator = (
             1
-            - (t3 * t4 * t5 * np.exp(1j * phi4))
-            - (r2 * r3 * r4 * np.exp(1j * (phi2)))
-            - (t1 * t2 * t3 * t4 * np.exp(1j * (phi2 + phi4)))
-            - (t1 * t2 * t3 * np.exp(1j * phi1))
-            - (r1 * r3 * r5 * np.exp(1j * phi3))
-            + (r1 * r2 * r3 * r4 * np.exp(1j * (phi2 + phi3)))
+            - np.exp(1j * (phi1 + phi4)) * r1 * r2 * r4 * r5
+            + np.exp(1j * phi3) * r3 * t1 * t2
+            + np.exp(1j * phi4) * r2 * r4 * t3
+            - np.exp(1j * phi1) * r1 * r5 * t3
+            - np.exp(1j * phi2) * r3 * t4 * t5
+            - np.exp(1j * (phi2 + phi3)) * t1 * t2 * t4 * t5
         )
     elif EXPRESSION == "Shreyas":
         # My matrix (Blue)
@@ -87,6 +89,19 @@ def generate_t_prime(t: np.ndarray, phi: np.ndarray) -> np.ndarray:
         denominator = (r3 - np.exp(1j * phi3) * r1 * r5) * (
             r3 - np.exp(1j * phi2) * r2 * r4
         ) + (t3 + np.exp(1j * phi4) * t4 * t5) * (t3 + np.exp(1j * phi1) * t1 * t2)
+    elif EXPRESSION == "Cain":
+        numerator = (
+            +t1 * t5 * (r2 * r3 * r4 * np.exp(1j * phi3) - 1)
+            + t2
+            * t4
+            * (np.exp(1j * (phi1 + phi4)))
+            * (r1 * r3 * r5 * np.exp(-1j * phi2) - 1)
+            + t3 * (t2 * t5 * np.exp(1j * phi1) + t1 * t4 * np.exp(1j * phi4))
+        )
+
+        denominator = +(r3 - r2 * r4 * np.exp(1j * phi3)) * (
+            r3 - r1 * r5 * np.exp(1j * phi2)
+        ) + (t3 - t4 * t5 * np.exp(1j * phi4)) * (t3 - t1 * t2 * np.exp(1j * phi1))
     else:
         # Shaw's form (2023 thesis paper)
         numerator = (
@@ -247,7 +262,7 @@ def rg_iterations_for_fp(
                 print("=" * 100)
 
         # Update distributions and values for next iteration
-        print("no previous z distribution existed, here we are.")
+        # print("no previous z distribution existed, here we are.")
         next_g = convert_z_to_g(current_Qz.sample_z(N))
         next_t = np.sqrt(next_g)
         P_t = Probability_Distribution(next_t, bins, range=T_RANGE)
@@ -308,7 +323,7 @@ def rg_iterator_for_nu(Qz: Probability_Distribution) -> Probability_Distribution
     This function maintains the same bin structure as the input distribution
     and uses the same sampling parameters N defined in config.
     """
-
+    print("We've entered here now.")
     z_sample = Qz.sample_z(N)
     g_values = convert_z_to_g(z_sample)
     t_values = np.sqrt(g_values)
