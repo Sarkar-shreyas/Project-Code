@@ -3,10 +3,10 @@
 import numpy as np
 from typing import Optional
 from scipy.stats import beta, chi2_contingency
-from src.distribution_production import Probability_Distribution
-from config import N, T_RANGE, BINS, EXPRESSION
 import matplotlib.pyplot as plt
 from time import time
+from src.distribution_production import Probability_Distribution
+from config import N, T_RANGE, BINS, EXPRESSION
 
 
 def load_data(filename: Optional[str] = None) -> np.ndarray:
@@ -54,7 +54,7 @@ def plot_beta_fixed_params(
         values += 1e-3
 
     bin_centers = 0.5 * (bins[:-1] + bins[1:])
-    plt.plot(bin_centers, 3 * values, label="Beta fixed params")
+    plt.plot(bin_centers, values, label="Beta fixed params")
     print("Plotted data for fixed constraints")
     return values
 
