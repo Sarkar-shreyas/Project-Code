@@ -1,13 +1,12 @@
 #!/bin/bash
 
-
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem-per-cpu=3988
 #SBATCH --cpus-per-task=1
-#SBATCH --array=0-8
+#SBATCH --array=0-6
 #SBATCH --time=08:00:00
-#SBATCH --job-name=generate_arrays
+#SBATCH --job-name=generate_smaller_arrays
 #SBATCH --output=../job_outputs/bootstrap/%x_%A_%a.out
 #SBATCH --error=../job_logs/bootstrap/%x_%A_%a.err
 
